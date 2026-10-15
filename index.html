@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NPS/CSAT Theme Miner</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11,11,11,0.10);
+  --accent: #2a78d6;
+  --seq: #2a78d6;
+  --good-text: #006300;
+  --bad-text: #b3282a;
+  --pro: #2a78d6;
+  --pas: #c3c2b7;
+  --det: #e34948;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --bg: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --accent: #3987e5; --seq: #3987e5; --good-text: #0ca30c; --bad-text: #e66767;
+    --pro: #3987e5; --pas: #5a5954; --det: #e66767;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 48px; }
+header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; margin-bottom: 14px; }
+h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+.sub { color: var(--ink2); margin: 2px 0 0; max-width: 62ch; }
+.badge { display: inline-block; font-size: 11px; padding: 1px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--ink2); background: var(--surface); margin-left: 8px; vertical-align: middle; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: transparent; color: var(--ink2); padding: 7px 16px; font: inherit; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #fff; font-weight: 600; }
+.seg button:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; }
+.filters label { display: flex; align-items: center; gap: 6px; color: var(--ink2); font-size: 12px; }
+select, input[type=search], input[type=text], textarea { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; }
+textarea { width: 100%; resize: vertical; }
+.filters .count { margin-left: auto; color: var(--ink2); font-size: 12px; }
+.btn { font: inherit; border: 1px solid var(--border); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+.btn:hover { background: var(--bg); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.small { padding: 2px 8px; font-size: 12px; }
+nav.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--grid); margin-bottom: 16px; overflow-x: auto; }
+nav.tabs button { border: 0; background: transparent; padding: 9px 14px; font: inherit; color: var(--ink2); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+nav.tabs button[aria-selected="true"] { color: var(--ink); font-weight: 600; border-bottom-color: var(--accent); }
+.grid { display: grid; gap: 14px; }
+.kpis { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); margin-bottom: 14px; }
+.two { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); margin-bottom: 14px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+.card h2 { font-size: 14px; margin: 0 0 2px; }
+.card .hint { color: var(--ink2); font-size: 12px; margin: 0 0 10px; }
+.kpi .label { color: var(--ink2); font-size: 12px; }
+.kpi .value { font-size: 30px; font-weight: 650; letter-spacing: -0.02em; line-height: 1.2; }
+.kpi .note { font-size: 12px; color: var(--ink2); }
+.up { color: var(--good-text); } .down { color: var(--bad-text); }
+.cardhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
+svg.chart text { font: 11px system-ui, sans-serif; fill: var(--muted); }
+svg.chart text.lbl { fill: var(--ink2); }
+svg.chart .col rect { fill: transparent; cursor: pointer; }
+svg.chart .col .guide { stroke: var(--axis); stroke-width: 1; opacity: 0; pointer-events: none; }
+svg.chart .col:hover .guide { opacity: 1; }
+svg.chart .sel { fill: var(--accent); opacity: 0.08; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--ink2); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--surface); color: var(--ink); border-color: var(--ink2); font-weight: 600; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--grid); vertical-align: middle; }
+th { font-weight: 600; color: var(--ink2); font-size: 12px; white-space: nowrap; }
+th.sortable { cursor: pointer; user-select: none; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.click { cursor: pointer; }
+tr.click:hover td { background: var(--bg); }
+.scroll { overflow-x: auto; }
+.bar { display: flex; gap: 2px; height: 14px; border-radius: 3px; overflow: hidden; }
+.bar > span { display: block; min-width: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink2); margin-top: 6px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.hbars { display: grid; gap: 8px; }
+.hrow { display: grid; grid-template-columns: minmax(110px, 38%) 1fr 40px; gap: 8px; align-items: center; cursor: pointer; font-size: 13px; border-radius: 6px; }
+.hrow:hover { background: var(--bg); }
+.hrow .track { background: var(--grid); height: 10px; border-radius: 3px; overflow: hidden; }
+.hrow .fill { display: block; height: 100%; border-radius: 3px; }
+.hrow .n { text-align: right; color: var(--ink2); font-variant-numeric: tabular-nums; }
+.trend { font-size: 12px; white-space: nowrap; }
+.pill { display: inline-block; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--bg); white-space: nowrap; }
+.pill.pro { border-color: var(--pro); } .pill.det { border-color: var(--det); } .pill.pas { border-color: var(--axis); }
+.tag { display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); background: var(--bg); }
+.tag .s { font-size: 10px; }
+.verb { padding: 12px 0; border-bottom: 1px solid var(--grid); }
+.verb:last-child { border-bottom: 0; }
+.verb .meta { display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--muted); font-size: 12px; margin-bottom: 4px; align-items: center; }
+.verb .text { font-size: 14px; margin: 2px 0 6px; }
+.verb .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+mark { background: color-mix(in srgb, var(--mk, var(--accent)) 28%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; border-bottom: 2px solid var(--mk, var(--accent)); }
+.heat td.cell { text-align: center; font-variant-numeric: tabular-nums; cursor: pointer; border: 2px solid var(--surface); border-radius: 4px; min-width: 76px; }
+.heat td.cell:hover { outline: 2px solid var(--ink2); outline-offset: -2px; }
+.muted { color: var(--ink2); }
+.small { font-size: 12px; }
+.empty { padding: 24px; text-align: center; color: var(--ink2); }
+.prio { display: grid; grid-template-columns: 28px minmax(140px, 1.4fr) minmax(120px, 1.6fr) 90px 110px 120px; gap: 10px; align-items: center; padding: 10px 6px; border-bottom: 1px solid var(--grid); }
+.prio .rank { color: var(--muted); font-variant-numeric: tabular-nums; }
+.prio .track { display: block; background: var(--grid); height: 10px; border-radius: 3px; overflow: hidden; }
+.prio .fill { display: block; height: 100%; }
+.detail { padding: 8px 12px 14px 40px; border-bottom: 1px solid var(--grid); background: var(--bg); border-radius: 0 0 8px 8px; }
+.detail h3 { font-size: 12px; margin: 10px 0 4px; color: var(--ink2); text-transform: uppercase; letter-spacing: 0.04em; }
+.quote { border-left: 3px solid var(--grid); padding: 2px 10px; margin: 6px 0; }
+.edit { display: grid; grid-template-columns: 1fr; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--grid); }
+.edit .row { display: flex; gap: 8px; align-items: center; }
+.edit .row input[type=text] { flex: 1; font-weight: 600; }
+#tip { position: fixed; z-index: 10; pointer-events: none; background: var(--ink); color: var(--bg); padding: 6px 9px; border-radius: 6px; font-size: 12px; white-space: pre-line; max-width: 280px; opacity: 0; transition: opacity .08s; }
+#toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 11; }
+footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
+@media (max-width: 760px) { .prio { grid-template-columns: 24px 1fr 80px; } .prio .hide-s { display: none; } .detail { padding-left: 12px; } }
+@media (forced-colors: active) { .bar > span, .hrow .fill, .prio .fill { forced-color-adjust: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>NPS/CSAT Theme Miner <span class="badge" id="badge">Synthetic data</span></h1>
+      <p class="sub">Turns open-text survey comments into themes, sentiment and a ranked list of what to fix. Tagging is rule-based, so every tag is explainable and the keywords are yours to edit.</p>
+    </div>
+    <div class="seg" role="group" aria-label="Survey type" id="surveySeg"></div>
+  </header>
+  <section class="filters" id="filters" aria-label="Filters"></section>
+  <nav class="tabs" id="tabs" role="tablist"></nav>
+  <main id="main"></main>
+  <footer>Data and engine are separate layers: data.js holds raw responses, engine.js tags and aggregates them. Replace data.js with a real export in the same shape to use live data.</footer>
+</div>
+<div id="tip" role="tooltip"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="data.js"></script>
+<script src="engine.js"></script>
+<script>
+(function () {
+  'use strict';
+  var E = window.NPSEngine, DATA = window.NPS_DATA;
+  var LS_KEY = 'themeMiner.taxonomy.v1';
+
+  /* ---------------- taxonomy state ---------------- */
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function normalizeTax(t) {
+    var used = {};
+    t.forEach(function (x) { if (x.slot) used[x.slot] = true; });
+    t.forEach(function (x) {
+      if (!x.slot) {
+        for (var i = 1; i <= 8; i++) if (!used[i]) { x.slot = i; used[i] = true; return; }
+        x.slot = 0;
+      }
+    });
+    return t;
+  }
+  function loadTax() {
+    try {
+      var s = localStorage.getItem(LS_KEY);
+      if (s) { var t = JSON.parse(s); if (Array.isArray(t) && t.length) return normalizeTax(t); }
+    } catch (e) { /* storage may be unavailable */ }
+    return normalizeTax(clone(E.DEFAULT_TAXONOMY));
+  }
+  function saveTax() { try { localStorage.setItem(LS_KEY, JSON.stringify(taxonomy)); } catch (e) { /* ignore */ } }
+
+  var taxonomy = loadTax(), compiled, analyzed;
+  function reanalyze() { compiled = E.compile(taxonomy); analyzed = E.analyzeAll(DATA.responses, compiled); }
+  reanalyze();
+
+  var ALL_MONTHS = E.uniqueSorted(DATA.responses.map(function (r) { return r.date.slice(0, 7); }));
+  var DIMS = { tier: 'Customer tier', product: 'Product', region: 'Region' };
+  var TABS = [['overview', 'Overview'], ['themes', 'Themes'], ['segments', 'Segments'], ['verbatims', 'Verbatims'], ['priorities', 'Priorities'], ['taxonomy', 'Taxonomy']];
+
+  var S = {
+    tab: 'overview', survey: 'NPS', from: '', to: '', tier: '', product: '', region: '',
+    themeSel: null, trendMode: 'share', tSort: 'mentions', tDir: -1,
+    segDim: 'tier', segMetric: 'negShare',
+    vSearch: '', vSent: '', vTheme: '', vSort: 'new', vShown: 25,
+    plan: {}, open: {}, tables: {}
+  };
+
+  /* ---------------- helpers ---------------- */
+  function $(sel) { return document.querySelector(sel); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  function tipAttr(s) { return ' data-tip="' + esc(s) + '"'; }
+  function mlabel(m) {
+    var names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return names[parseInt(m.slice(5), 10) - 1] + " '" + m.slice(2, 4);
+  }
+  function sgn(n) { return n > 0 ? '+' + n : String(n); }
+  function r0(n) { return Math.round(n); }
+  function themeBy(id) { return taxonomy.filter(function (t) { return t.id === id; })[0]; }
+  function nameOf(id) { var t = themeBy(id); return t ? t.name : id; }
+  function colorOf(id) { var t = themeBy(id); return t && t.slot ? 'var(--s' + t.slot + ')' : 'var(--muted)'; }
+  function isNPS() { return S.survey === 'NPS'; }
+  function headLabel() { return isNPS() ? 'NPS' : 'CSAT (% satisfied)'; }
+  function headFmt(v) { return v == null ? 'n/a' : (isNPS() ? sgn(v) : v + '%'); }
+  function catLabels() { return isNPS() ? { pro: 'Promoters', pas: 'Passives', det: 'Detractors' } : { pro: 'Satisfied', pas: 'Neutral', det: 'Dissatisfied' }; }
+  function catWord(r) { var c = E.scoreCat(r), L = isNPSof(r) ? { pro: 'Promoter', pas: 'Passive', det: 'Detractor' } : { pro: 'Satisfied', pas: 'Neutral', det: 'Dissatisfied' }; return L[c]; }
+  function isNPSof(r) { return r.survey === 'NPS'; }
+  function scoreMax() { return isNPS() ? 10 : 5; }
+
+  function filtered() {
+    return analyzed.filter(function (r) {
+      return r.survey === S.survey &&
+        (!S.tier || r.tier === S.tier) && (!S.product || r.product === S.product) && (!S.region || r.region === S.region) &&
+        (!S.from || r.month >= S.from) && (!S.to || r.month <= S.to);
+    });
+  }
+  function surveyOnly() { return analyzed.filter(function (r) { return r.survey === S.survey; }); }
+
+  function momentum(list) {
+    var months = E.uniqueSorted(list.map(function (r) { return r.month; }));
+    if (months.length < 6) return null;
+    var rec = months.slice(-3), pri = months.slice(-6, -3);
+    var a = E.summarize(list.filter(function (r) { return rec.indexOf(r.month) >= 0; }), S.survey).score;
+    var b = E.summarize(list.filter(function (r) { return pri.indexOf(r.month) >= 0; }), S.survey).score;
+    return { d: a - b, label: mlabel(rec[0]) + ' to ' + mlabel(rec[2]) };
+  }
+
+  function trendBadge(change) {
+    if (change == null) return '<span class="trend muted">n/a</span>';
+    if (change >= 2.5) return '<span class="trend">&#9650; Rising <span class="muted">(' + (change > 0 ? '+' : '') + change.toFixed(1) + ' pts)</span></span>';
+    if (change <= -2.5) return '<span class="trend">&#9660; Falling <span class="muted">(' + change.toFixed(1) + ' pts)</span></span>';
+    return '<span class="trend muted">&#9654; Steady <span>(' + (change > 0 ? '+' : '') + change.toFixed(1) + ' pts)</span></span>';
+  }
+
+  /* ---------------- charts ---------------- */
+  function niceScale(lo, hi, n) {
+    if (hi === lo) hi = lo + 1;
+    var range = hi - lo;
+    var step = Math.pow(10, Math.floor(Math.log10(range / n)));
+    var err = range / n / step;
+    step *= err >= 7.5 ? 10 : err >= 3.5 ? 5 : err >= 1.5 ? 2 : 1;
+    return { lo: Math.floor(lo / step) * step, hi: Math.ceil(hi / step) * step, step: step };
+  }
+
+  // o: {keys, labels, series:[{name,color,values}], fmt, min, max, endLabels, selMonths, pickAct}
+  function lineChart(o) {
+    var W = 980, H = o.height || 270, L = 46, R = o.endLabels ? 176 : 18, T = 12, B = 28;
+    var vals = [];
+    o.series.forEach(function (s) { s.values.forEach(function (v) { if (v != null) vals.push(v); }); });
+    var lo = vals.length ? Math.min.apply(null, vals) : 0, hi = vals.length ? Math.max.apply(null, vals) : 1;
+    if (o.min != null) lo = Math.min(lo, o.min);
+    if (o.max != null) hi = Math.max(hi, o.max);
+    var sc = niceScale(lo, hi, 4);
+    var n = o.keys.length;
+    function x(i) { return L + (W - L - R) * (n === 1 ? 0.5 : i / (n - 1)); }
+    function y(v) { return T + (H - T - B) * (1 - (v - sc.lo) / (sc.hi - sc.lo)); }
+    var g = '';
+    for (var tv = sc.lo; tv <= sc.hi + sc.step / 2; tv += sc.step) {
+      var yy = y(tv);
+      var isZero = Math.abs(tv) < 1e-9 && sc.lo < 0;
+      g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + yy + '" y2="' + yy + '" stroke="' + (isZero ? 'var(--axis)' : 'var(--grid)') + '" stroke-width="1"/>';
+      g += '<text x="' + (L - 8) + '" y="' + (yy + 4) + '" text-anchor="end">' + esc(o.fmt(Math.round(tv * 100) / 100)) + '</text>';
+    }
+    var step = n > 8 ? 2 : 1;
+    o.keys.forEach(function (k, i) {
+      if (i % step === 0 || i === n - 1) g += '<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle">' + esc(o.labels[i]) + '</text>';
+    });
+    if (o.selMonths) {
+      o.keys.forEach(function (k, i) {
+        if (o.selMonths.indexOf(k) >= 0) g += '<rect class="sel" x="' + (x(i) - 14) + '" y="' + T + '" width="28" height="' + (H - T - B) + '"/>';
+      });
+    }
+    o.series.forEach(function (s) {
+      var d = '', pen = false;
+      s.values.forEach(function (v, i) {
+        if (v == null) { pen = false; return; }
+        d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1) + ' ';
+        pen = true;
+      });
+      g += '<path d="' + d + '" fill="none" stroke="' + s.color + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+      s.values.forEach(function (v, i) {
+        if (v != null) g += '<circle cx="' + x(i) + '" cy="' + y(v) + '" r="3.5" fill="' + s.color + '" stroke="var(--surface)" stroke-width="2"/>';
+      });
+    });
+    if (o.endLabels) {
+      var ends = [];
+      o.series.forEach(function (s) {
+        for (var i = s.values.length - 1; i >= 0; i--) if (s.values[i] != null) { ends.push({ s: s, y: y(s.values[i]), i: i }); break; }
+      });
+      ends.sort(function (a, b) { return a.y - b.y; });
+      for (var k = 1; k < ends.length; k++) if (ends[k].y - ends[k - 1].y < 14) ends[k].y = ends[k - 1].y + 14;
+      ends.forEach(function (e) {
+        g += '<circle cx="' + (x(e.i) + 12) + '" cy="' + (e.y - 3) + '" r="4" fill="' + e.s.color + '"/>';
+        g += '<text class="lbl" x="' + (x(e.i) + 21) + '" y="' + (e.y + 1) + '">' + esc(e.s.name.length > 27 ? e.s.name.slice(0, 26) + '...' : e.s.name) + '</text>';
+      });
+    }
+    // hover columns: one tooltip listing every series for that month
+    var colW = (W - L - R) / Math.max(1, n - 1);
+    o.keys.forEach(function (k, i) {
+      var lines = [o.labels[i]];
+      o.series.forEach(function (s) { lines.push(s.name + ': ' + (s.values[i] == null ? 'n/a' : o.fmt(Math.round(s.values[i] * 10) / 10))); });
+      g += '<g class="col"' + tipAttr(lines.join('\n')) + (o.pickAct ? ' data-act="pickMonth" data-month="' + k + '"' : '') + '>' +
+        '<rect x="' + (x(i) - colW / 2) + '" y="' + T + '" width="' + colW + '" height="' + (H - T - B) + '"/>' +
+        '<line class="guide" x1="' + x(i) + '" x2="' + x(i) + '" y1="' + T + '" y2="' + (H - B) + '"/></g>';
+    });
+    return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(o.aria || 'Line chart') + '">' + g + '</svg>';
+  }
+
+  function dataTable(o) {
+    var h = '<div class="scroll"><table><thead><tr><th>Month</th>' + o.series.map(function (s) { return '<th class="num">' + esc(s.name) + '</th>'; }).join('') + '</tr></thead><tbody>';
+    o.keys.forEach(function (k, i) {
+      h += '<tr><td>' + esc(o.labels[i]) + '</td>' + o.series.map(function (s) { return '<td class="num">' + (s.values[i] == null ? 'n/a' : esc(o.fmt(Math.round(s.values[i] * 10) / 10))) + '</td>'; }).join('') + '</tr>';
+    });
+    return h + '</tbody></table></div>';
+  }
+
+  function chartBlock(id, o) {
+    var asTable = !!S.tables[id];
+    return '<div style="text-align:right;margin-bottom:4px"><button class="btn small" data-act="toggleTable" data-chart="' + id + '" aria-pressed="' + asTable + '">' + (asTable ? 'Show chart' : 'View as table') + '</button></div>' +
+      (asTable ? dataTable(o) : lineChart(o));
+  }
+
+  function mixBar(sm) {
+    if (!sm.n) return '<div class="muted small">No responses</div>';
+    var L = catLabels();
+    function seg(k, color, p, count) {
+      return '<span style="flex:' + (p * 100) + ' 1 0;background:' + color + '"' + tipAttr(L[k] + ': ' + r0(p * 100) + '% (' + count + ')') + '></span>';
+    }
+    return '<div class="bar" role="img" aria-label="' + L.det + ' ' + r0(sm.detP * 100) + '%, ' + L.pas + ' ' + r0(sm.pasP * 100) + '%, ' + L.pro + ' ' + r0(sm.proP * 100) + '%">' +
+      seg('det', 'var(--det)', sm.detP, sm.det) + seg('pas', 'var(--pas)', sm.pasP, sm.pas) + seg('pro', 'var(--pro)', sm.proP, sm.pro) + '</div>';
+  }
+  function mixLegend() {
+    var L = catLabels();
+    return '<div class="legend"><span><i style="background:var(--det)"></i>' + L.det + '</span><span><i style="background:var(--pas)"></i>' + L.pas + '</span><span><i style="background:var(--pro)"></i>' + L.pro + '</span></div>';
+  }
+
+  function hbars(items, max) {
+    return '<div class="hbars">' + items.map(function (it) {
+      return '<div class="hrow" tabindex="0" role="button" data-act="openVerb" data-theme="' + it.id + '" data-sent="' + it.sent + '"' + tipAttr(it.tip) + '>' +
+        '<span>' + esc(it.name) + '</span><span class="track"><span class="fill" style="width:' + (max ? it.value / max * 100 : 0) + '%;background:' + colorOf(it.id) + '"></span></span><span class="n">' + it.value + '</span></div>';
+    }).join('') + '</div>';
+  }
+
+  /* ---------------- text highlighting ---------------- */
+  function highlight(text, themes) {
+    var spans = [];
+    compiled.forEach(function (t) {
+      if (!themes.some(function (x) { return x.id === t.id; })) return;
+      t.keywords.forEach(function (k) {
+        var re = new RegExp('\\b' + escRe(k) + '\\w*', 'gi'), m;
+        while ((m = re.exec(text))) {
+          spans.push([m.index, m.index + m[0].length, t.id]);
+          if (!m[0].length) re.lastIndex++;
+        }
+      });
+    });
+    spans.sort(function (a, b) { return a[0] - b[0] || b[1] - a[1]; });
+    var out = '', pos = 0;
+    spans.forEach(function (s) {
+      if (s[0] < pos) return;
+      out += esc(text.slice(pos, s[0])) + '<mark style="--mk:' + colorOf(s[2]) + '">' + esc(text.slice(s[0], s[1])) + '</mark>';
+      pos = s[1];
+    });
+    return out + esc(text.slice(pos));
+  }
+
+  function themeTag(t) {
+    var sym = t.sent > 0 ? '&#9650;' : t.sent < 0 ? '&#9660;' : '&#9679;';
+    var word = t.sent > 0 ? 'positive' : t.sent < 0 ? 'negative' : 'neutral';
+    return '<span class="tag"' + tipAttr(nameOf(t.id) + ': ' + word + ' mention') + '><span class="dot" style="background:' + colorOf(t.id) + '"></span>' + esc(nameOf(t.id)) + ' <span class="s" aria-label="' + word + '">' + sym + '</span></span>';
+  }
+
+  function verbItem(r) {
+    var cat = E.scoreCat(r);
+    var sent = r.sentiment > 0 ? 'Positive' : r.sentiment < 0 ? 'Negative' : 'Neutral';
+    return '<div class="verb"><div class="meta"><span class="pill ' + cat + '">' + r.score + '/' + (r.survey === 'NPS' ? 10 : 5) + ' ' + catWord(r) + '</span>' +
+      '<span>' + esc(r.date) + '</span><span>' + esc(r.account) + '</span><span>' + esc(r.tier) + '</span><span>' + esc(r.product) + '</span><span>' + esc(r.region) + '</span><span>Tone: ' + sent + '</span></div>' +
+      '<div class="text">' + highlight(r.comment, r.themes) + '</div>' +
+      '<div class="tags">' + (r.themes.length ? r.themes.map(themeTag).join('') : '<span class="tag muted">No theme matched</span>') + '</div></div>';
+  }
+
+  /* ---------------- shell ---------------- */
+  function renderShell() {
+    $('#surveySeg').innerHTML = ['NPS', 'CSAT'].map(function (s) {
+      return '<button data-act="setSurvey" data-v="' + s + '" aria-pressed="' + (S.survey === s) + '">' + s + '</button>';
+    }).join('');
+    function sel(key, label, opts) {
+      return '<label>' + label + '<select data-bind="' + key + '" aria-label="' + label + '"><option value="">All</option>' +
+        opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (S[key] === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select></label>';
+    }
+    var mo = ALL_MONTHS.map(function (m) { return [m, mlabel(m)]; });
+    var all = surveyOnly();
+    var cnt = filtered().length;
+    $('#filters').innerHTML =
+      sel('from', 'From', mo) + sel('to', 'To', mo) +
+      sel('tier', 'Tier', E.dimValues(all, 'tier').map(function (v) { return [v, v]; })) +
+      sel('product', 'Product', E.dimValues(all, 'product').map(function (v) { return [v, v]; })) +
+      sel('region', 'Region', E.dimValues(all, 'region').map(function (v) { return [v, v]; })) +
+      '<button class="btn small" data-act="clearFilters">Clear filters</button>' +
+      '<span class="count">' + cnt + ' of ' + all.length + ' ' + S.survey + ' responses</span>';
+    $('#tabs').innerHTML = TABS.map(function (t) {
+      return '<button role="tab" data-act="setTab" data-v="' + t[0] + '" aria-selected="' + (S.tab === t[0]) + '">' + t[1] + '</button>';
+    }).join('');
+  }
+
+  /* ---------------- views ---------------- */
+  function viewOverview(list) {
+    var sm = E.summarize(list, S.survey);
+    var cov = E.coverage(list);
+    var ts = E.themeStats(list, taxonomy, S.survey);
+    var mom = momentum(list);
+    var top = ts.filter(function (t) { return t.neg > 0; }).sort(function (a, b) { return b.priority - a.priority; })[0];
+    var months = E.uniqueSorted(list.map(function (r) { return r.month; }));
+    var series = [{ name: headLabel(), color: 'var(--accent)', values: months.map(function (m) { return E.summarize(list.filter(function (r) { return r.month === m; }), S.survey).score; }) }];
+    var chartOpts = { keys: months, labels: months.map(mlabel), series: series, fmt: isNPS() ? sgn : function (v) { return v + '%'; }, min: isNPS() ? 0 : 0, max: isNPS() ? 0 : 100, pickAct: true, selMonths: S.from && S.from === S.to ? [S.from] : null, aria: headLabel() + ' by month' };
+
+    var pains = ts.filter(function (t) { return t.neg > 0; }).sort(function (a, b) { return b.neg - a.neg; }).slice(0, 4);
+    var strengths = ts.filter(function (t) { return t.pos > 0; }).sort(function (a, b) { return b.pos - a.pos; }).slice(0, 4);
+    var tierRows = E.dimValues(list, 'tier').map(function (v) {
+      var s2 = E.summarize(list.filter(function (r) { return r.tier === v; }), S.survey);
+      return '<div style="margin-bottom:10px"><div class="small muted" style="display:flex;justify-content:space-between"><span>' + esc(v) + ' (n=' + s2.n + ')</span><span>' + headLabel().split(' ')[0] + ' ' + headFmt(s2.score) + '</span></div>' + mixBar(s2) + '</div>';
+    }).join('');
+
+    return '<div class="grid kpis">' +
+      '<div class="card kpi"><div class="label">' + headLabel() + '</div><div class="value">' + headFmt(sm.score) + '</div><div class="note">' +
+        (mom ? '<span class="' + (mom.d >= 0 ? 'up' : 'down') + '">' + (mom.d >= 0 ? '&#9650;' : '&#9660;') + ' ' + (isNPS() ? sgn(mom.d) : sgn(mom.d) + ' pts') + '</span> vs prior 3 months' : 'Trend needs 6+ months in range') + '</div></div>' +
+      '<div class="card kpi"><div class="label">Average score</div><div class="value">' + (sm.avg == null ? 'n/a' : sm.avg.toFixed(1)) + '</div><div class="note">out of ' + scoreMax() + (isNPS() ? ' (0 to 10)' : ' (1 to 5)') + '</div></div>' +
+      '<div class="card kpi"><div class="label">Responses</div><div class="value">' + sm.n + '</div><div class="note">' + cov.commented + ' with comments (' + (sm.n ? r0(cov.commented / sm.n * 100) : 0) + '%)</div></div>' +
+      '<div class="card kpi"><div class="label">Comments with a theme</div><div class="value">' + cov.pct + '%</div><div class="note">Tune keywords in Taxonomy to raise this</div></div>' +
+      '<div class="card kpi"><div class="label">Top priority theme</div><div class="value" style="font-size:18px;line-height:1.4">' + (top ? esc(top.name) : 'n/a') + '</div><div class="note">' + (top ? top.neg + ' negative mentions' : 'No negative themes in range') + '</div></div>' +
+      '</div>' +
+      '<div class="card" style="margin-bottom:14px"><div class="cardhead"><div><h2>' + headLabel() + ' by month</h2><p class="hint">Click a month to filter the whole app to it. Click again to clear.</p></div></div>' + chartBlock('overview', chartOpts) + '</div>' +
+      '<div class="grid two">' +
+        '<div class="card"><h2>Score mix by customer tier</h2><p class="hint">Share of ' + catLabels().det.toLowerCase() + ', ' + catLabels().pas.toLowerCase() + ' and ' + catLabels().pro.toLowerCase() + '.</p>' +
+          mixBar(sm) + '<div class="small muted" style="margin:4px 0 12px">All tiers (n=' + sm.n + ')</div>' + tierRows + mixLegend() + '</div>' +
+        '<div class="card"><h2>Biggest pain points</h2><p class="hint">Negative mentions by theme. Click a row to read the comments.</p>' +
+          (pains.length ? hbars(pains.map(function (t) { return { id: t.id, name: t.name, value: t.neg, sent: -1, tip: t.name + ': ' + t.neg + ' negative mentions (' + r0(t.negRate) + '% of its mentions)' }; }), pains[0].neg) : '<div class="empty">No negative themes in this range</div>') +
+          '<h2 style="margin-top:18px">Biggest strengths</h2><p class="hint">Positive mentions by theme.</p>' +
+          (strengths.length ? hbars(strengths.map(function (t) { return { id: t.id, name: t.name, value: t.pos, sent: 1, tip: t.name + ': ' + t.pos + ' positive mentions' }; }), strengths[0].pos) : '<div class="empty">No positive themes in this range</div>') +
+        '</div>' +
+      '</div>';
+  }
+
+  function viewThemes(list) {
+    var ts = E.themeStats(list, taxonomy, S.survey);
+    if (!S.themeSel) S.themeSel = ts.slice().sort(function (a, b) { return b.mentions - a.mentions; }).slice(0, 4).map(function (t) { return t.id; });
+    S.themeSel = S.themeSel.filter(function (id) { return !!themeBy(id); });
+    var months = E.uniqueSorted(list.map(function (r) { return r.month; }));
+    var ser = E.themeSeries(list, taxonomy, months, S.trendMode);
+    var series = S.themeSel.map(function (id) { return { name: nameOf(id), color: colorOf(id), values: ser[id] }; });
+    var chips = taxonomy.map(function (t) {
+      return '<button class="chip" data-act="toggleTheme" data-theme="' + t.id + '" aria-pressed="' + (S.themeSel.indexOf(t.id) >= 0) + '"><span class="dot" style="background:' + colorOf(t.id) + '"></span>' + esc(t.name) + '</button>';
+    }).join('');
+    var mode = '<div class="seg" role="group" aria-label="Chart metric"><button data-act="trendMode" data-v="share" aria-pressed="' + (S.trendMode === 'share') + '">All mentions</button><button data-act="trendMode" data-v="neg" aria-pressed="' + (S.trendMode === 'neg') + '">Negative mentions</button></div>';
+    var chart = series.length ? chartBlock('themes', { keys: months, labels: months.map(mlabel), series: series, fmt: function (v) { return v + '%'; }, min: 0, endLabels: series.length <= 4, pickAct: true, selMonths: S.from && S.from === S.to ? [S.from] : null, aria: 'Theme mentions by month' }) : '<div class="empty">Select at least one theme above</div>';
+
+    var key = S.tSort, dir = S.tDir;
+    var rows = ts.slice().sort(function (a, b) {
+      var av = a[key], bv = b[key];
+      if (key === 'name') return dir * String(av).localeCompare(String(bv));
+      return dir * ((av == null ? -1e9 : av) - (bv == null ? -1e9 : bv));
+    });
+    function th(k, label, num) { return '<th class="sortable' + (num ? ' num' : '') + '" data-act="sortTable" data-k="' + k + '" aria-sort="' + (S.tSort === k ? (S.tDir > 0 ? 'ascending' : 'descending') : 'none') + '">' + label + (S.tSort === k ? (S.tDir > 0 ? ' &#9650;' : ' &#9660;') : '') + '</th>'; }
+    var table = '<div class="scroll"><table><thead><tr>' + th('name', 'Theme') + th('mentions', 'Mentions', 1) + th('share', '% of comments', 1) + th('negRate', '% negative', 1) + th('score', headLabel().split(' ')[0] + ' of mentioners', 1) + th('delta', 'vs overall', 1) + th('shareChange', 'Recent trend') + '<th></th></tr></thead><tbody>' +
+      rows.map(function (t) {
+        return '<tr class="click" data-act="toggleTheme" data-theme="' + t.id + '"' + tipAttr('Click to add or remove from the chart') + '>' +
+          '<td><span class="dot" style="background:' + colorOf(t.id) + ';margin-right:8px"></span>' + esc(t.name) + '</td>' +
+          '<td class="num">' + t.mentions + '</td><td class="num">' + r0(t.share) + '%</td><td class="num">' + r0(t.negRate) + '%</td>' +
+          '<td class="num">' + (t.score == null ? 'n/a' : headFmt(t.score)) + '</td>' +
+          '<td class="num ' + (t.delta == null ? '' : t.delta >= 0 ? 'up' : 'down') + '">' + (t.delta == null ? 'n/a' : (t.delta >= 0 ? '&#9650; ' : '&#9660; ') + sgn(t.delta)) + '</td>' +
+          '<td>' + trendBadge(t.shareChange) + '</td>' +
+          '<td><button class="btn small" data-act="openVerb" data-theme="' + t.id + '" data-sent="">Comments</button></td></tr>';
+      }).join('') + '</tbody></table></div>';
+
+    return '<div class="card" style="margin-bottom:14px"><div class="cardhead"><div><h2>Theme trends over time</h2><p class="hint">Share of comments in each month that mention the theme. Hover a month for exact values, click it to filter.</p></div>' + mode + '</div>' +
+      '<div class="chips" role="group" aria-label="Themes shown">' + chips + '</div>' + chart + '</div>' +
+      '<div class="card"><h2>Theme scorecard</h2><p class="hint">Recent trend compares the last 3 months in range with the 3 before. Click a header to sort.</p>' + table + '</div>';
+  }
+
+  function heatCellStyle(v, max) {
+    var p = max ? Math.min(1, v / max) : 0;
+    var mix = Math.round(8 + p * 80);
+    return 'background:color-mix(in srgb, var(--seq) ' + mix + '%, var(--surface));color:' + (p > 0.6 ? '#fff' : 'var(--ink)');
+  }
+
+  function viewSegments(list) {
+    var dim = S.segDim;
+    var h = E.heat(list, taxonomy, dim, S.survey);
+    var metric = S.segMetric;
+    var max = 0;
+    h.rows.forEach(function (r) { r.cells.forEach(function (c) { if (c[metric] > max) max = c[metric]; }); });
+    var dimBtns = '<div class="seg" role="group" aria-label="Segment dimension">' + Object.keys(DIMS).map(function (d) { return '<button data-act="segDim" data-v="' + d + '" aria-pressed="' + (S.segDim === d) + '">' + DIMS[d] + '</button>'; }).join('') + '</div>';
+    var metBtns = '<div class="seg" role="group" aria-label="Heatmap metric"><button data-act="segMetric" data-v="negShare" aria-pressed="' + (metric === 'negShare') + '">Negative mentions</button><button data-act="segMetric" data-v="share" aria-pressed="' + (metric === 'share') + '">All mentions</button></div>';
+    var cards = '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:14px">' + h.segments.map(function (s) {
+      return '<div class="card"><div class="small muted">' + esc(s.value) + ' (n=' + s.n + ')</div><div style="font-size:24px;font-weight:650">' + headFmt(s.summary.score) + '</div>' + mixBar(s.summary) + '</div>';
+    }).join('') + '</div>';
+    var table = '<div class="scroll"><table class="heat"><thead><tr><th>Theme</th>' + h.segments.map(function (s) { return '<th class="num">' + esc(s.value) + '<div class="muted" style="font-weight:400">' + s.commented + ' comments</div></th>'; }).join('') + '</tr></thead><tbody>' +
+      h.rows.map(function (r) {
+        return '<tr><td><span class="dot" style="background:' + colorOf(r.id) + ';margin-right:8px"></span>' + esc(r.name) + '</td>' + r.cells.map(function (c) {
+          var tip = r.name + ' / ' + c.value + '\n' + c.mentions + ' mentions (' + r0(c.share) + '% of comments)\n' + c.neg + ' negative (' + r0(c.negShare) + '% of comments)';
+          return '<td class="cell" tabindex="0" role="button" data-act="segCell" data-dim="' + dim + '" data-v="' + esc(c.value) + '" data-theme="' + r.id + '" style="' + heatCellStyle(c[metric], max) + '"' + tipAttr(tip) + '>' + r0(c[metric]) + '%</td>';
+        }).join('') + '</tr>';
+      }).join('') + '</tbody></table></div>';
+    return '<div class="cardhead" style="margin-bottom:10px"><div><h2 style="font-size:16px;margin:0">Segment drill-down</h2><p class="hint" style="margin:0">Compare how score and themes differ across segments.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap">' + dimBtns + '</div></div>' + mixLegend() + '<div style="height:8px"></div>' + cards +
+      '<div class="card"><div class="cardhead"><div><h2>Where themes concentrate</h2><p class="hint">Each cell is a percent of that segment\'s comments. Darker means more. Click a cell to read those comments.</p></div>' + metBtns + '</div>' + table + '</div>';
+  }
+
+  function verbList() {
+    var items = filtered().filter(function (r) { return r.hasComment; });
+    if (S.vTheme) items = items.filter(function (r) { return E.themeSent(r, S.vTheme) !== null; });
+    if (S.vSent) {
+      var want = S.vSent === 'pos' ? 1 : S.vSent === 'neg' ? -1 : 0;
+      items = items.filter(function (r) { return (S.vTheme ? E.themeSent(r, S.vTheme) : r.sentiment) === want; });
+    }
+    if (S.vSearch) { var q = S.vSearch.toLowerCase(); items = items.filter(function (r) { return r.comment.toLowerCase().indexOf(q) >= 0 || r.account.toLowerCase().indexOf(q) >= 0; }); }
+    items = items.slice().sort(function (a, b) {
+      if (S.vSort === 'low') return a.score - b.score || (a.date < b.date ? 1 : -1);
+      if (S.vSort === 'high') return b.score - a.score || (a.date < b.date ? 1 : -1);
+      return a.date < b.date ? 1 : a.date > b.date ? -1 : 0;
+    });
+    return items;
+  }
+
+  function verbListHtml() {
+    var items = verbList();
+    var shown = items.slice(0, S.vShown);
+    return '<div class="small muted" style="margin-bottom:6px">' + items.length + ' comments' + (items.length > shown.length ? ', showing ' + shown.length : '') + '</div>' +
+      (shown.length ? shown.map(verbItem).join('') : '<div class="empty">No comments match these filters</div>') +
+      (items.length > shown.length ? '<div style="text-align:center;margin-top:10px"><button class="btn" data-act="vMore">Show 25 more</button></div>' : '');
+  }
+
+  function viewVerbatims() {
+    var chips = '<button class="chip" data-act="vTheme" data-theme="" aria-pressed="' + (!S.vTheme) + '">All themes</button>' + taxonomy.map(function (t) {
+      return '<button class="chip" data-act="vTheme" data-theme="' + t.id + '" aria-pressed="' + (S.vTheme === t.id) + '"><span class="dot" style="background:' + colorOf(t.id) + '"></span>' + esc(t.name) + '</button>';
+    }).join('');
+    return '<div class="card"><div class="cardhead"><div><h2>Verbatim explorer</h2><p class="hint">Highlighted words are the keywords that triggered each theme. Tags show whether the mention was positive, negative or neutral.</p></div>' +
+      '<button class="btn" data-act="exportCsv">Export CSV</button></div>' +
+      '<div class="chips" role="group" aria-label="Theme filter">' + chips + '</div>' +
+      '<div class="filters" style="border:0;padding:0;margin-bottom:10px;background:transparent">' +
+        '<label>Search<input type="search" id="vSearch" placeholder="Words or account" value="' + esc(S.vSearch) + '"></label>' +
+        '<label>Tone<select data-bind="vSent" aria-label="Tone"><option value="">Any</option><option value="neg"' + (S.vSent === 'neg' ? ' selected' : '') + '>Negative</option><option value="pos"' + (S.vSent === 'pos' ? ' selected' : '') + '>Positive</option><option value="neu"' + (S.vSent === 'neu' ? ' selected' : '') + '>Neutral</option></select></label>' +
+        '<label>Sort<select data-bind="vSort" aria-label="Sort"><option value="new"' + (S.vSort === 'new' ? ' selected' : '') + '>Newest</option><option value="low"' + (S.vSort === 'low' ? ' selected' : '') + '>Lowest score</option><option value="high"' + (S.vSort === 'high' ? ' selected' : '') + '>Highest score</option></select></label>' +
+      '</div><div id="vlist">' + verbListHtml() + '</div></div>';
+  }
+
+  function viewPriorities(list) {
+    var ts = E.themeStats(list, taxonomy, S.survey).filter(function (t) { return t.neg > 0; }).sort(function (a, b) { return b.priority - a.priority; });
+    var max = ts.length ? ts[0].priority : 1;
+    var base = E.summarize(list, S.survey);
+    var rows = ts.map(function (t, i) {
+      var plan = E.PLAYS[t.id] || { owner: 'Owning team', play: 'Review the lowest-scoring comments with the owning team and agree one change to test this quarter.' };
+      var open = !!S.open[t.id];
+      var h = '<div class="prio"><span class="rank">' + (i + 1) + '</span>' +
+        '<span><strong>' + esc(t.name) + '</strong><div class="small muted">' + t.neg + ' negative of ' + t.mentions + ' mentions</div></span>' +
+        '<span class="hide-s"><span class="track"' + tipAttr('Priority index ' + t.priority.toFixed(1) + ' = ' + t.neg + ' negative mentions x ' + (t.gap * 100).toFixed(0) + '% score gap') + '><span class="fill" style="width:' + (max ? t.priority / max * 100 : 0) + '%;background:' + colorOf(t.id) + '"></span></span><div class="small muted">Priority ' + t.priority.toFixed(1) + '</div></span>' +
+        '<span class="hide-s small">Avg ' + (t.negAvg == null ? 'n/a' : t.negAvg.toFixed(1)) + '<div class="muted">vs ' + (base.avg == null ? 'n/a' : base.avg.toFixed(1)) + ' overall</div></span>' +
+        '<span class="hide-s">' + trendBadge(t.negChange) + '</span>' +
+        '<span style="display:flex;gap:6px;justify-content:flex-end"><label class="small" style="display:flex;gap:4px;align-items:center"><input type="checkbox" data-act="togglePlan" data-theme="' + t.id + '"' + (S.plan[t.id] ? ' checked' : '') + '> Plan</label><button class="btn small" data-act="toggleOpen" data-theme="' + t.id + '" aria-expanded="' + open + '">' + (open ? 'Hide' : 'Details') + '</button></span></div>';
+      if (open) {
+        var ex = list.filter(function (r) { return r.hasComment && E.themeSent(r, t.id) < 0; }).sort(function (a, b) { return a.score - b.score; }).slice(0, 3);
+        h += '<div class="detail"><h3>Suggested follow-up</h3><div><strong>' + esc(plan.owner) + ':</strong> ' + esc(plan.play) + '</div><h3>Lowest-scoring comments</h3>' +
+          ex.map(function (r) { return '<div class="quote">' + highlight(r.comment, r.themes) + '<div class="small muted">' + r.score + '/' + (r.survey === 'NPS' ? 10 : 5) + ' / ' + esc(r.tier) + ' / ' + esc(r.region) + ' / ' + esc(r.date) + '</div></div>'; }).join('') +
+          '<div style="margin-top:8px"><button class="btn small" data-act="openVerb" data-theme="' + t.id + '" data-sent="-1">Read all negative comments</button></div></div>';
+      }
+      return h;
+    }).join('');
+    var chosen = ts.filter(function (t) { return S.plan[t.id]; });
+    var planBox = '<div class="card" style="margin-top:14px"><div class="cardhead"><div><h2>Action plan draft</h2><p class="hint">Tick "Plan" on a theme to add it here.</p></div><button class="btn primary" data-act="copyPlan"' + (chosen.length ? '' : ' disabled') + '>Copy plan</button></div>' +
+      (chosen.length ? '<ol>' + chosen.map(function (t) { var p = E.PLAYS[t.id] || { owner: 'Owning team', play: 'Review lowest-scoring comments and agree one change to test.' }; return '<li><strong>' + esc(t.name) + '</strong> (' + esc(p.owner) + '): ' + esc(p.play) + '</li>'; }).join('') + '</ol>' : '<div class="muted small">Nothing selected yet.</div>') + '</div>';
+    return '<div class="card"><h2>What to fix first</h2><p class="hint">Priority index = negative mentions x how far those customers\' average score sits below the overall average. It favors themes that are both common and costly to the score.</p>' +
+      (rows || '<div class="empty">No negative themes in this range</div>') + '</div>' + planBox;
+  }
+
+  function viewTaxonomy() {
+    var editors = taxonomy.map(function (t, i) {
+      return '<div class="edit" data-theme="' + t.id + '"><div class="row"><span class="dot" style="background:' + colorOf(t.id) + '"></span>' +
+        '<input type="text" data-tax="name" data-i="' + i + '" value="' + esc(t.name) + '" aria-label="Theme name">' +
+        '<span class="small muted" id="tstat-' + t.id + '"></span><button class="btn small" data-act="delTheme" data-theme="' + t.id + '">Delete</button></div>' +
+        '<textarea rows="2" data-tax="keywords" data-i="' + i + '" aria-label="Keywords for ' + esc(t.name) + '">' + esc(t.keywords.join(', ')) + '</textarea></div>';
+    }).join('');
+    return '<div class="grid two">' +
+      '<div class="card"><div class="cardhead"><div><h2>Theme taxonomy</h2><p class="hint">Keywords match the start of a word, so "report" also catches "reports" and "reporting". Changes re-tag every comment instantly and are saved in this browser.</p></div>' +
+        '<div style="display:flex;gap:6px"><button class="btn" data-act="addTheme">Add theme</button><button class="btn" data-act="resetTax">Reset</button></div></div>' + editors + '</div>' +
+      '<div><div class="card" style="margin-bottom:14px"><h2>Coverage</h2><div id="covBox"></div></div>' +
+        '<div class="card" style="margin-bottom:14px"><h2>Try a comment</h2><p class="hint">Type or paste text to see which themes and tone it gets.</p><textarea id="tester" rows="3" placeholder="Support is great but reporting is clunky"></textarea><div id="testOut" style="margin-top:8px"></div></div>' +
+        '<div class="card"><h2>Comments with no theme</h2><p class="hint">Use these to spot keywords you are missing. Click one to test it.</p><div id="untagged"></div></div></div></div>';
+  }
+
+  function refreshTaxPanels() {
+    var scope = analyzed.filter(function (r) { return r.survey === S.survey; });
+    var cov = E.coverage(scope);
+    var cb = $('#covBox');
+    if (cb) cb.innerHTML = '<div style="font-size:26px;font-weight:650">' + cov.pct + '%</div><div class="small muted">' + cov.tagged + ' of ' + cov.commented + ' ' + S.survey + ' comments have at least one theme</div><div class="bar" style="margin-top:8px"><span style="flex:' + cov.pct + ';background:var(--accent)"></span><span style="flex:' + (100 - cov.pct) + ';background:var(--grid)"></span></div>';
+    var ts = E.themeStats(scope, taxonomy, S.survey);
+    ts.forEach(function (t) { var el = document.getElementById('tstat-' + t.id); if (el) el.textContent = t.mentions + ' mentions, ' + t.neg + ' negative'; });
+    var un = scope.filter(function (r) { return r.hasComment && !r.themes.length; });
+    var seen = {}, uniq = [];
+    un.forEach(function (r) { if (!seen[r.comment]) { seen[r.comment] = 1; uniq.push(r.comment); } });
+    var ub = $('#untagged');
+    if (ub) ub.innerHTML = uniq.length ? '<div class="small muted" style="margin-bottom:6px">' + un.length + ' comments, ' + uniq.length + ' distinct</div>' + uniq.slice(0, 8).map(function (c) { return '<div class="quote" tabindex="0" role="button" style="cursor:pointer" data-act="fillTest" data-text="' + esc(c) + '">' + esc(c) + '</div>'; }).join('') : '<div class="muted small">Every comment has a theme.</div>';
+    runTester();
+  }
+
+  function runTester() {
+    var ta = $('#tester'), out = $('#testOut');
+    if (!ta || !out) return;
+    var txt = ta.value.trim();
+    if (!txt) { out.innerHTML = '<span class="muted small">Nothing to analyze yet.</span>'; return; }
+    var r = E.analyzeOne({ id: 'T', date: '2026-01-01', survey: S.survey, score: 0, comment: txt }, compiled);
+    var tone = r.sentiment > 0 ? 'Positive' : r.sentiment < 0 ? 'Negative' : 'Neutral';
+    out.innerHTML = '<div class="text" style="margin-bottom:6px">' + highlight(txt, r.themes) + '</div><div class="tags" style="display:flex;gap:6px;flex-wrap:wrap">' + (r.themes.length ? r.themes.map(themeTag).join('') : '<span class="tag muted">No theme matched</span>') + '</div><div class="small muted" style="margin-top:6px">Overall tone: ' + tone + '</div>';
+  }
+
+  function render() {
+    renderShell();
+    var list = filtered();
+    var html = '';
+    if (S.tab === 'overview') html = viewOverview(list);
+    else if (S.tab === 'themes') html = viewThemes(list);
+    else if (S.tab === 'segments') html = viewSegments(list);
+    else if (S.tab === 'verbatims') html = viewVerbatims();
+    else if (S.tab === 'priorities') html = viewPriorities(list);
+    else html = viewTaxonomy();
+    $('#main').innerHTML = list.length || S.tab === 'taxonomy' ? html : '<div class="card empty">No responses match the current filters. Try clearing them.</div>';
+    if (S.tab === 'taxonomy') refreshTaxPanels();
+  }
+
+  /* ---------------- actions ---------------- */
+  function toast(msg) {
+    var t = $('#toast'); t.textContent = msg; t.style.opacity = 1;
+    clearTimeout(toast.h); toast.h = setTimeout(function () { t.style.opacity = 0; }, 1800);
+  }
+  function copyText(txt) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(txt).then(function () { return true; }, function () { return false; });
+    return Promise.resolve(false);
+  }
+  function planText() {
+    var list = filtered();
+    var ts = E.themeStats(list, taxonomy, S.survey).filter(function (t) { return S.plan[t.id]; }).sort(function (a, b) { return b.priority - a.priority; });
+    return 'Customer feedback action plan (' + S.survey + ', ' + list.length + ' responses)\n\n' + ts.map(function (t, i) {
+      var p = E.PLAYS[t.id] || { owner: 'Owning team', play: 'Review lowest-scoring comments and agree one change to test.' };
+      return (i + 1) + '. ' + t.name + ' [' + t.neg + ' negative mentions]\n   Owner: ' + p.owner + '\n   Play: ' + p.play;
+    }).join('\n\n');
+  }
+  function slug(name) {
+    var base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'theme', id = base, n = 2;
+    while (themeBy(id)) id = base + '-' + n++;
+    return id;
+  }
+  function usedSlot() {
+    var used = {}; taxonomy.forEach(function (t) { if (t.slot) used[t.slot] = 1; });
+    for (var i = 1; i <= 8; i++) if (!used[i]) return i;
+    return 0;
+  }
+
+  var H = {
+    setTab: function (el) { S.tab = el.dataset.v; render(); },
+    setSurvey: function (el) { S.survey = el.dataset.v; render(); },
+    clearFilters: function () { S.from = S.to = S.tier = S.product = S.region = ''; render(); },
+    pickMonth: function (el) { var m = el.dataset.month; if (S.from === m && S.to === m) { S.from = S.to = ''; } else { S.from = S.to = m; } render(); },
+    toggleTable: function (el) { var c = el.dataset.chart; S.tables[c] = !S.tables[c]; render(); },
+    toggleTheme: function (el) {
+      var id = el.dataset.theme, i = S.themeSel.indexOf(id);
+      if (i >= 0) S.themeSel.splice(i, 1); else S.themeSel.push(id);
+      render();
+    },
+    trendMode: function (el) { S.trendMode = el.dataset.v; render(); },
+    sortTable: function (el) { var k = el.dataset.k; if (S.tSort === k) S.tDir = -S.tDir; else { S.tSort = k; S.tDir = k === 'name' ? 1 : -1; } render(); },
+    openVerb: function (el, ev) {
+      if (ev) ev.stopPropagation();
+      S.vTheme = el.dataset.theme || ''; S.vSent = el.dataset.sent === '1' ? 'pos' : el.dataset.sent === '-1' ? 'neg' : '';
+      S.vShown = 25; S.vSearch = ''; S.tab = 'verbatims'; render(); window.scrollTo(0, 0);
+    },
+    vTheme: function (el) { S.vTheme = el.dataset.theme; S.vShown = 25; render(); },
+    vMore: function () { S.vShown += 25; $('#vlist').innerHTML = verbListHtml(); },
+    segDim: function (el) { S.segDim = el.dataset.v; render(); },
+    segMetric: function (el) { S.segMetric = el.dataset.v; render(); },
+    segCell: function (el) {
+      S[el.dataset.dim] = el.dataset.v; S.vTheme = el.dataset.theme; S.vSent = S.segMetric === 'negShare' ? 'neg' : '';
+      S.vShown = 25; S.vSearch = ''; S.tab = 'verbatims'; render(); window.scrollTo(0, 0);
+    },
+    togglePlan: function (el) { S.plan[el.dataset.theme] = el.checked; render(); },
+    toggleOpen: function (el) { S.open[el.dataset.theme] = !S.open[el.dataset.theme]; render(); },
+    copyPlan: function () { copyText(planText()).then(function (ok) { toast(ok ? 'Action plan copied' : 'Copy not available here. Select the text instead.'); }); },
+    exportCsv: function () {
+      var csv = E.toCsv(verbList(), nameOf);
+      try {
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+        a.download = 'theme-miner-comments.csv';
+        document.body.appendChild(a); a.click(); a.remove();
+        toast('CSV exported');
+      } catch (e) { toast('Export is not available in this browser'); }
+    },
+    addTheme: function () {
+      var name = 'New theme', id = slug(name);
+      taxonomy.push({ id: id, name: name, keywords: [], slot: usedSlot() });
+      saveTax(); reanalyze(); render();
+    },
+    delTheme: function (el) {
+      taxonomy = taxonomy.filter(function (t) { return t.id !== el.dataset.theme; });
+      if (S.themeSel) S.themeSel = S.themeSel.filter(function (id) { return id !== el.dataset.theme; });
+      if (S.vTheme === el.dataset.theme) S.vTheme = '';
+      saveTax(); reanalyze(); render();
+    },
+    resetTax: function () {
+      taxonomy = normalizeTax(clone(E.DEFAULT_TAXONOMY)); S.themeSel = null; S.vTheme = '';
+      saveTax(); reanalyze(); render(); toast('Taxonomy reset to defaults');
+    },
+    fillTest: function (el) { var ta = $('#tester'); if (ta) { ta.value = el.dataset.text; runTester(); ta.focus(); } }
+  };
+
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-act]');
+    if (!el || el.tagName === 'SELECT') return;
+    if (el.tagName === 'INPUT' && el.type === 'checkbox') return; // handled on change
+    var fn = H[el.dataset.act];
+    if (fn) fn(el, e);
+  });
+  document.addEventListener('keydown', function (e) {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[role="button"][data-act]')) {
+      e.preventDefault(); H[e.target.dataset.act](e.target, e);
+    }
+  });
+  document.addEventListener('change', function (e) {
+    var el = e.target;
+    if (el.matches && el.matches('input[type=checkbox][data-act]')) { H[el.dataset.act](el); return; }
+    if (el.dataset && el.dataset.bind) {
+      S[el.dataset.bind] = el.value;
+      if (S.from && S.to && S.from > S.to) { if (el.dataset.bind === 'from') S.to = S.from; else S.from = S.to; }
+      S.vShown = 25;
+      render();
+    }
+  });
+  document.addEventListener('input', function (e) {
+    var el = e.target;
+    if (el.id === 'vSearch') { S.vSearch = el.value; S.vShown = 25; $('#vlist').innerHTML = verbListHtml(); return; }
+    if (el.id === 'tester') { runTester(); return; }
+    if (el.dataset && el.dataset.tax) {
+      var t = taxonomy[parseInt(el.dataset.i, 10)];
+      if (!t) return;
+      if (el.dataset.tax === 'name') { t.name = el.value || 'Untitled'; }
+      else { t.keywords = el.value.split(',').map(function (k) { return k.trim(); }).filter(Boolean); }
+      saveTax(); reanalyze(); refreshTaxPanels();
+    }
+  });
+
+  var tip = $('#tip');
+  document.addEventListener('mousemove', function (e) {
+    var el = e.target.closest ? e.target.closest('[data-tip]') : null;
+    if (!el) { tip.style.opacity = 0; return; }
+    tip.textContent = el.getAttribute('data-tip');
+    tip.style.opacity = 1;
+    var x = e.clientX + 14, y = e.clientY + 14;
+    var w = tip.offsetWidth, h = tip.offsetHeight;
+    if (x + w > window.innerWidth - 8) x = e.clientX - w - 14;
+    if (y + h > window.innerHeight - 8) y = e.clientY - h - 14;
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
+  });
+  document.addEventListener('mouseleave', function () { tip.style.opacity = 0; });
+
+  window.ThemeMiner = { state: S, render: render, handlers: H };
+  render();
+})();
+</script>
+</body>
+</html>
