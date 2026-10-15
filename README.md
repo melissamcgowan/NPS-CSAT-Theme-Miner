@@ -2,7 +2,7 @@
 
 An interactive web app that turns free-text survey comments into themes, sentiment and a ranked list of what to fix first. It runs entirely in the browser with no build step and no server.
 
-**Live demo:** open `index.html`, or publish the folder with GitHub Pages (Settings, Pages, deploy from the main branch root).
+**Live demo:** open `index.html`, or https://melissamcgowan.github.io/NPS-CSAT-Theme-Miner/
 
 > All data in this repo is synthetic. No real customer information is included.
 
